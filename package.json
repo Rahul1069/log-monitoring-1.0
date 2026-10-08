@@ -1,0 +1,25 @@
+{
+  "name": "distributed-log-monitoring-system",
+  "version": "1.0.0",
+  "description": "Real-time Distributed Log Monitoring System for College Project",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "agent": "node agent/agent.js",
+    "agent:node1": "node agent/agent.js --node node-alpha --service auth-service --file logs/auth-service.log",
+    "agent:node2": "node agent/agent.js --node node-beta --service payment-service --file logs/payment-service.log",
+    "agent:node3": "node agent/agent.js --node node-gamma --service api-gateway --file logs/api-gateway.log",
+    "generate": "node tools/generate-logs.js",
+    "generate:continuous": "node tools/generate-logs.js --continuous",
+    "generate:spike": "node tools/generate-logs.js --error-spike"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.5.1",
+    "ws": "^8.18.0"
+  },
+  "author": "Distributed Systems Team",
+  "license": "MIT"
+}

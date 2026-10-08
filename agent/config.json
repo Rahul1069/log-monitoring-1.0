@@ -1,0 +1,11 @@
+{
+  "serverUrl": "http://localhost:5000",
+  "apiKey": "log-monitor-secret-key-2026",
+  "nodeName": "node-alpha",
+  "logFile": "logs/auth-service.log",
+  "serviceName": "auth-service",
+  "batchSize": 25,
+  "batchIntervalMs": 1000,
+  "heartbeatIntervalMs": 15000,
+  "maxQueueSize": 50000
+}

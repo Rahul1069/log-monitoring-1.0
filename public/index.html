@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distributed Log Monitoring System</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/vendor/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app-root">
+    <!-- Left Narrow Sidebar -->
+    <aside id="sidebar">
+      <div class="brand-section">
+        <span class="brand-logo-badge">LOG</span>
+        <span class="brand-title">DISTRIBUTED MON</span>
+      </div>
+
+      <ul class="nav-menu">
+        <li class="nav-item active" data-view="overview">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Overview</span>
+        </li>
+        <li class="nav-item" data-view="live">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>Live Tail</span>
+          <span class="nav-badge" id="nav-live-count">0</span>
+        </li>
+        <li class="nav-item" data-view="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span>Search</span>
+        </li>
+        <li class="nav-item" data-view="nodes">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          <span>Nodes</span>
+          <span class="nav-badge" id="nav-nodes-count">0</span>
+        </li>
+        <li class="nav-item" data-view="alerts">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <span>Alerts</span>
+          <span class="nav-badge" id="nav-alerts-badge">0</span>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div>Architecture: Distributed Agent</div>
+        <div class="arch-pill">Node.js · Mongoose · WS</div>
+      </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div id="main-wrapper">
+      <!-- Compact Topbar -->
+      <header id="topbar">
+        <div class="topbar-left">
+          <span class="page-title" id="current-view-title">SYSTEM OVERVIEW</span>
+          <div class="topbar-stats">
+            <span class="stat-chip">
+              <span class="status-dot offline" id="ws-status-dot"></span>
+              <span id="ws-status-text">Connecting...</span>
+            </span>
+            <span class="stat-chip">
+              <span>Ingested:</span>
+              <strong id="topbar-total-logs">0</strong>
+            </span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="btn btn-sm" id="btn-theme-toggle" title="Toggle Light/Dark Theme">
+            Theme: <span id="theme-label">Dark</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Views Container -->
+      <main id="content-views">
+        <!-- ==================== 1. OVERVIEW VIEW ==================== -->
+        <section id="view-overview" class="view-pane active">
+          <!-- Top 4 KPI Metrics -->
+          <div class="metrics-row">
+            <div class="metric-card">
+              <div class="metric-label">Total Logs Ingested</div>
+              <div class="metric-val" id="metric-total-logs">0</div>
+              <div class="metric-sub">Stored in MongoDB</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Error Rate</div>
+              <div class="metric-val" id="metric-error-rate">0.00%</div>
+              <div class="metric-sub"><span id="metric-error-count">0</span> ERROR/FATAL logs</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Active Nodes</div>
+              <div class="metric-val" id="metric-online-nodes">0 / 0</div>
+              <div class="metric-sub">Heartbeat within 60s</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Alert Incidents</div>
+              <div class="metric-val" id="metric-alert-count">0</div>
+              <div class="metric-sub">Triggered threshold events</div>
+            </div>
+          </div>
+
+          <!-- Charts Section -->
+          <div class="charts-row">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Log Ingestion Rate (Past 30 Minutes)</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Real DB Aggregation</span>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-throughput"></canvas>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Distribution by Level</span>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-levels"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Tables: Top Services & Recent Alerts -->
+          <div class="overview-bottom-row">
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Top Active Services</span>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Service Name</th>
+                    <th>Total Ingested</th>
+                    <th>Errors</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="overview-services-tbody">
+                  <tr><td colspan="4" style="text-align: center; color: var(--text-dim);">No service data yet</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Recent Alert Incidents</span>
+                <button class="btn btn-sm" id="btn-goto-alerts">View All</button>
+              </div>
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Rule</th>
+                    <th>Level</th>
+                    <th>Count</th>
+                  </tr>
+                </thead>
+                <tbody id="overview-alerts-tbody">
+                  <tr><td colspan="4" style="text-align: center; color: var(--text-dim);">No alerts triggered yet</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 2. LIVE TAIL VIEW ==================== -->
+        <section id="view-live" class="view-pane">
+          <div class="live-toolbar">
+            <div class="toolbar-filters">
+              <select class="select" id="live-filter-level">
+                <option value="ALL">All Levels</option>
+                <option value="DEBUG">DEBUG</option>
+                <option value="INFO">INFO</option>
+                <option value="WARN">WARN</option>
+                <option value="ERROR">ERROR</option>
+                <option value="FATAL">FATAL</option>
+              </select>
+
+              <select class="select" id="live-filter-service">
+                <option value="ALL">All Services</option>
+              </select>
+
+              <select class="select" id="live-filter-node">
+                <option value="ALL">All Nodes</option>
+              </select>
+
+              <input type="text" class="input input-mono" id="live-filter-text" placeholder="Live text filter..." style="width: 180px;">
+            </div>
+
+            <div class="toolbar-actions">
+              <button class="btn btn-sm" id="btn-live-pause">
+                <span class="status-dot online" id="live-state-dot"></span>
+                <span id="live-pause-label">Pause Stream</span>
+              </button>
+              <label style="font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                <input type="checkbox" id="live-autoscroll" checked>
+                <span>Auto-scroll</span>
+              </label>
+              <button class="btn btn-sm" id="btn-live-clear">Clear</button>
+              <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="live-buffer-counter">0 buffered</span>
+            </div>
+          </div>
+
+          <div class="live-log-container" id="live-logs-scroll">
+            <div id="live-empty-state" class="empty-state">
+              <div class="empty-state-title">No logs received yet</div>
+              <div class="empty-state-text">
+                Start an agent from your terminal to stream logs in real time:<br>
+                <code>npm run agent:node1</code> or <code>npm run generate:continuous</code>
+              </div>
+            </div>
+            <div id="live-logs-list"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 3. SEARCH & EXPLORE VIEW ==================== -->
+        <section id="view-search" class="view-pane">
+          <div class="search-bar-panel">
+            <div class="search-inputs-grid">
+              <input type="text" class="input input-mono" id="search-keyword" placeholder="Search message with keyword or regex...">
+              
+              <select class="select" id="search-level">
+                <option value="ALL">All Levels</option>
+                <option value="DEBUG">DEBUG</option>
+                <option value="INFO">INFO</option>
+                <option value="WARN">WARN</option>
+                <option value="ERROR">ERROR</option>
+                <option value="FATAL">FATAL</option>
+              </select>
+
+              <select class="select" id="search-service">
+                <option value="ALL">All Services</option>
+              </select>
+
+              <select class="select" id="search-node">
+                <option value="ALL">All Nodes</option>
+              </select>
+            </div>
+
+            <div class="search-time-row">
+              <span style="font-size: 11px; font-weight: 600; color: var(--text-muted);">TIME RANGE:</span>
+              <button class="time-preset-btn active" data-range="all">All Time</button>
+              <button class="time-preset-btn" data-range="15m">15m</button>
+              <button class="time-preset-btn" data-range="1h">1h</button>
+              <button class="time-preset-btn" data-range="6h">6h</button>
+              <button class="time-preset-btn" data-range="24h">24h</button>
+              <button class="time-preset-btn" data-range="7d">7d</button>
+
+              <span style="margin-left: 12px; font-size: 11px; color: var(--text-dim);">Custom:</span>
+              <input type="datetime-local" class="input" id="search-from" style="padding: 2px 6px; font-size: 11px;">
+              <span>to</span>
+              <input type="datetime-local" class="input" id="search-to" style="padding: 2px 6px; font-size: 11px;">
+
+              <div style="margin-left: auto; display: flex; gap: 8px;">
+                <button class="btn btn-primary" id="btn-search-run">Search</button>
+                <button class="btn" id="btn-search-reset">Reset</button>
+                <button class="btn" id="btn-export-csv" title="Stream full result set as CSV">Export CSV</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="search-results-header">
+            <div>
+              <span id="search-count-label">Showing results</span>
+              <span style="color: var(--text-dim); margin-left: 8px;" id="search-timing-label"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>Rows per page:</span>
+              <select class="select" id="search-limit" style="padding: 2px 6px;">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 0; overflow-x: auto; flex: 1;">
+            <table class="data-table" id="search-results-table">
+              <thead>
+                <tr>
+                  <th style="width: 170px;">Timestamp</th>
+                  <th style="width: 75px;">Level</th>
+                  <th style="width: 120px;">Node</th>
+                  <th style="width: 140px;">Service</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody id="search-tbody">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 30px;">Click Search to query logs</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-bar">
+            <div>
+              Page <strong id="search-curr-page">1</strong> of <strong id="search-total-pages">1</strong>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-sm" id="btn-search-prev">Previous</button>
+              <button class="btn btn-sm" id="btn-search-next">Next</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 4. NODES VIEW ==================== -->
+        <section id="view-nodes" class="view-pane">
+          <div class="card-header" style="margin-bottom: 16px;">
+            <div>
+              <h2 style="font-size: 14px; font-weight: 600;">Distributed Agent Cluster</h2>
+              <p style="font-size: 11.5px; color: var(--text-muted);">Real-time heartbeat monitoring of all distributed nodes that have sent logs</p>
+            </div>
+            <button class="btn btn-sm" id="btn-refresh-nodes">Refresh Now</button>
+          </div>
+
+          <div class="card" style="padding: 0; overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Node ID</th>
+                  <th>Hostname</th>
+                  <th>IP Address</th>
+                  <th>First Registered</th>
+                  <th>Last Log / Heartbeat</th>
+                  <th>Total Logs</th>
+                  <th>Reporting Services</th>
+                </tr>
+              </thead>
+              <tbody id="nodes-tbody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 30px;">No nodes detected yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================== 5. ALERTS VIEW ==================== -->
+        <section id="view-alerts" class="view-pane">
+          <div class="alerts-grid">
+            <!-- Alert Rules Table -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <span class="card-title">Configured Alert Rules</span>
+                  <div style="font-size: 11px; color: var(--text-dim);">Background worker checks rules every 15s using MongoDB countDocuments queries</div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-sm" id="btn-trigger-check">Evaluate Rules Now</button>
+                  <button class="btn btn-primary btn-sm" id="btn-open-create-rule">+ Create Alert Rule</button>
+                </div>
+              </div>
+
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Rule Name</th>
+                    <th>Condition</th>
+                    <th>Cooldown</th>
+                    <th>Webhook</th>
+                    <th>Last Fired</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="alert-rules-tbody">
+                  <tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">No alert rules configured</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Triggered Alerts History Table -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Triggered Alerts Audit Trail</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Stored in AlertHistory collection</span>
+              </div>
+
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Triggered At</th>
+                    <th>Rule Name</th>
+                    <th>Service</th>
+                    <th>Level</th>
+                    <th>Log Count / Threshold</th>
+                    <th>Window</th>
+                    <th>Webhook Status</th>
+                  </tr>
+                </thead>
+                <tbody id="alert-history-tbody">
+                  <tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">No alerts triggered yet</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Create Alert Rule Modal -->
+  <div class="modal-overlay" id="modal-create-rule">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <strong style="font-size: 13px;">Create New Alert Rule</strong>
+        <button class="btn btn-sm" id="btn-close-rule-modal">&times;</button>
+      </div>
+      <form id="form-create-rule">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Rule Name</label>
+            <input type="text" class="input" id="rule-name" placeholder="e.g. Payment Service Error Spike" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label>Service</label>
+              <select class="select" id="rule-service">
+                <option value="ALL">ALL Services</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Log Level</label>
+              <select class="select" id="rule-level">
+                <option value="ERROR" selected>ERROR</option>
+                <option value="FATAL">FATAL</option>
+                <option value="WARN">WARN</option>
+                <option value="INFO">INFO</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label>Threshold Count</label>
+              <input type="number" class="input" id="rule-threshold" min="1" value="10" required>
+            </div>
+            <div class="form-group">
+              <label>Window (Minutes)</label>
+              <input type="number" class="input" id="rule-window" min="1" value="5" required>
+            </div>
+            <div class="form-group">
+              <label>Cooldown (Minutes)</label>
+              <input type="number" class="input" id="rule-cooldown" min="1" value="10" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Webhook URL (Optional)</label>
+            <input type="url" class="input" id="rule-webhook" placeholder="https://example.com/webhook (e.g. Slack/Discord)">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" id="btn-cancel-rule-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Alert Rule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- App JavaScript Modules -->
+  <script src="js/api.js"></script>
+  <script src="js/ws.js"></script>
+  <script src="js/overview.js"></script>
+  <script src="js/live-tail.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/nodes.js"></script>
+  <script src="js/alerts.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
